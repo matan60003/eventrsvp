@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite + Prisma: לא משתמשים ב-enum בסכמה.
+// Guest.status: 'pending' | 'confirmed' | 'declined'
+// MessageTarget.status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed'
+
+model Workspace {
+  id                      String   @id @default(cuid())
+  name                    String
+  ownerPhone              String?
+  messageCreditsRemaining Int      @default(0)
+  activeEventId           String?
+  createdAt               DateTime @default(now())
+  events                  Event[]
+  creditLedger            CreditLedger[]
+}
+
+model Event {
+  id             String    @id @default(cuid())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId    String
+  title          String
+  date           DateTime?
+  timeStr        String?
+  venue          String?
+  inviteImageUrl String?
+  timezone       String?
+  createdAt      DateTime  @default(now())
+  guests         Guest[]
+  messages       Message[]
+}
+
+model Guest {
+  id           String   @id @default(cuid())
+  event        Event    @relation(fields: [eventId], references: [id])
+  eventId      String
+  name         String
+  phone        String
+  relation     String?
+  side         String?
+  status       String   @default("pending") // 'pending' | 'confirmed' | 'declined'
+  responseTime DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([eventId, phone])
+}
+
+model Message {
+  id           String   @id @default(cuid())
+  event        Event    @relation(fields: [eventId], references: [id])
+  eventId      String
+  bodyText     String
+  imageUrl     String?
+  scheduledAt  DateTime?
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  targets      MessageTarget[]
+}
+
+model MessageTarget {
+  id                 String   @id @default(cuid())
+  message            Message  @relation(fields: [messageId], references: [id])
+  messageId          String
+  guestId            String?
+  phone              String
+  status             String   @default("queued") // 'queued' | 'sent' | 'delivered' | 'read' | 'failed'
+  providerMessageId  String?
+  errorCode          String?
+  createdAt          DateTime @default(now())
+  sentAt             DateTime?
+  deliveredAt        DateTime?
+  readAt             DateTime?
+
+  @@index([providerMessageId])
+}
+
+model CreditLedger {
+  id           String    @id @default(cuid())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId  String
+  delta        Int
+  reason       String
+  referenceId  String?
+  createdAt    DateTime  @default(now())
+}
